@@ -1,76 +1,96 @@
-import express from 'express';
-import weather from 'weather-js';
+//import express from 'express';
+const { Router } = require('express');
+var express = require('express');
+var bodyParser = require('body-parser')
 var app = express();
-
+var jsonParser = bodyParser.json()
 app.set('view engine', 'ejs');
+app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
+const port = process.env.PORT || 8080;
 
+global.tally = [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [3, 0],
+    [4, 0],
+    [5, 0],
+    [6, 0],
+    [7, 0],
+    [8, 0],
+    [9, 0],
+]
+var admin = require("firebase-admin");
 
+var serviceAccount = require("./itelectiveframeworks.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+const db = admin.firestore();
+const itemcollection = db.collection('items');
+
+const candi = []
+for (let i = 0; i < 10; i++ ) {
+    candi.push("candidate/" + i.toString())
+}
+candi.forEach(candidate => {
+    app.get("/" + candidate, async (req, res) => {
+        const items = await itemcollection.get();
+        
+        let data = {
+            url: req.url,
+            itemdata: items.docs,
+            tally: tally,
+        }
+        res.render('pages/candidate', data);
+    })
+})
 
 app.get('/', function (req, res) {
     let data = {
         url: req.url
     }
     res.render('pages/index', data);
+    console.log(tally)
 })
-app.get('/davao', function (req, res) {
-    weather.find({search: 'Davao, PH', degreeType: 'C'}, function(err, result) {
-        if(err) {console.log(err);}
-        else{
-            let data = {
-                url: req.url,
-                weatherdavao: eval(JSON.stringify(result, null, 2))
-            }
-            res.render('pages/davao', data);
-        }
-       
-      });
-    
-})
-app.get('/tokyo', function (req, res) {
-    weather.find({search: 'Tokyo, JP', degreeType: 'C'}, function(err, result) {
-        if(err) {console.log(err);}
-        else{
-            let data = {
-                url: req.url,
-                weathertokyo: result,
-            }
-            res.render('pages/tokyo', data);
-        }
-       
-      });
-})
-app.get('/toronto', function (req, res) {
-    weather.find({search: 'Toronto, CA', degreeType: 'C'}, function(err, result) {
-        if(err) {console.log(err);}
-        else{
-            console.log(JSON.stringify(result, null, 2));
-            let data = {
-                url: req.url,
-                weathertoronto: result,
-            }
-            res.render('pages/toronto', data);
-        }
-       
-      });
-})
-app.get('/jakarta', function (req, res) {
-    weather.find({search: 'Jakarta, ID', degreeType: 'C'}, function(err, result) {
-        if(err) {console.log(err);}
-        else{
-            console.log(JSON.stringify(result, null, 2));
-            let data = {
-                url: req.url,
-                weatherjakarta: result,
-            }
-            res.render('pages/jakarta', data);
-        }
-       
-      });
-})
-app.get('/others', function (req, res) {
+
+app.get('/results', async function (req, res) {
+    const items = await itemcollection.get();
     let data = {
-        url: req.url
+        url: req.url,
+        tally: tally,
+        itemdata: items.docs,
     }
-    res.render('pages/others', data);
+    res.render('pages/results', data);
 })
-app.listen(8080);
+app.post('/results', jsonParser, async function (req, res) {
+    const received = req.body;
+    const items = await itemcollection.get();
+    for (let i = 0; i < 10; i++ ) {
+        if (tally[i][0] == received.passid) {
+            tally[i][1] = tally[i][1] + 1
+        }
+    }
+    console.log(tally)
+    let data = {
+        url: req.url,
+        tally: tally,
+        itemdata: items.docs,
+    }
+    res.redirect('/results')
+})
+app.get('/lists', async function (req, res) {
+    const items = await itemcollection.get();
+    // items.forEach(doc => {
+    //     console.log(doc.id, '=>', doc.data());
+    // }
+    //     )
+    let data = {
+        url: req.url,
+        itemdata: items.docs,
+    }
+    res.render('pages/lists', data);
+})
+app.listen(port,);
